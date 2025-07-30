@@ -1,1 +1,209 @@
 
+kubeadm (Production level using)
+
+Kubeadm Installation Guide
+Prerequisites
+Ubuntu t2.medium  2 instance. One is master node, 2nd is Woker node
+
+
+AWS Setup
+
+Ensure that all instances are in the same Security Group. Expose port 6443 in the Security Group to allow worker nodes to join the cluster. 
+
+Execute on Both "Master" & "Worker" Nodes
+
+Disable Swap: Required for Kubernetes to function correctly.
+
+sudo swapoff -a
+
+Load Necessary Kernel Modules: Required for Kubernetes networking.
+
+Explicitly loads kernel modules (overlay and br_netfilter) and sets sysctl parameters for networking.
+Ensures proper networking for Kubernetes.
+Includes commands to verify the loaded modules.
+
+cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
+overlay
+br_netfilter
+EOF
+
+sudo modprobe overlay
+sudo modprobe br_netfilter
+
+Set Sysctl Parameters: Helps with networking.
+
+cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-iptables  = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward                 = 1
+EOF
+
+sudo sysctl --system
+lsmod | grep br_netfilter
+lsmod | grep overlay
+
+Install Containerd:
+
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+sudo apt-get update
+sudo apt-get install -y containerd.io
+
+containerd config default | sed -e 's/SystemdCgroup = false/SystemdCgroup = true/' -e 's/sandbox_image = "registry.k8s.io\/pause:3.6"/sandbox_image = "registry.k8s.io\/pause:3.9"/' | sudo tee /etc/containerd/config.toml
+
+sudo systemctl restart containerd
+sudo systemctl status containerd
+
+Install Kubernetes Components:
+
+sudo apt-get update
+sudo apt-get install -y apt-transport-https ca-certificates curl gpg
+
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+sudo apt-get update
+sudo apt-get install -y kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl
+
+Execute ONLY on the "Master" Node
+Initialize the Cluster:
+sudo kubeadm init
+
+Set Up Local kubeconfig:
+mkdir -p "$HOME"/.kube
+sudo cp -i /etc/kubernetes/admin.conf "$HOME"/.kube/config
+sudo chown "$(id -u)":"$(id -g)" "$HOME"/.kube/config
+
+Install a Network Plugin (Calico):
+calico/weave/Flannel
+kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.0/manifests/calico.yaml
+
+Generate Join Command:
+kubeadm token create --print-join-command
+
+Copy this generated token for next command.
+
+
+
+Your Kubernetes control-plane has initialized successfully!
+
+To start using your cluster, you need to run the following as a regular user:
+
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+
+Alternatively, if you are the root user, you can run:
+
+  export KUBECONFIG=/etc/kubernetes/admin.conf
+
+Execute on ALL of your Worker Nodes
+
+Then you can join any number of worker nodes by running the following on each as root:
+
+sudo kubeadm join 172.31.43.51:6443 --token jwmuhe.aovnwp7burnya28p \
+--discovery-token-ca-cert-hash sha256:c84a37e0bee0b85813a3e1a04024c73601a4da9034372b2eef77013bb67f5321 
+
+If you are using containerd then need to add "--cri-socket" 
+
+Run this command in worker node:
+
+sudo kubeadm join <private-ip-of-control-plane>:6443 --token <token> --discovery-token-ca-cert-hash sha256:<hash> --cri-socket "unix:///run/containerd/containerd.sock" --v=5
+
+eg: 
+
+sudo kubeadm join 172.31.43.51:6443 --token jwmuhe.aovnwp7burnya28p --discovery-token-ca-cert-hash sha256:c84a37e0bee0b85813a3e1a04024c73601a4da9034372b2eef77013bb67f5321 > --cri-socke "unix:///run/containerd/containerd.sock" --dry-run
+
+--dry-run
+It’s like a safe preview to validate what the command would do
+It’s especially useful for validating configurations and avoiding accidental changes in production
+
+sudo kubeadm join 172.31.43.51:6443 --token jwmuhe.aovnwp7burnya28p --discovery-token-ca-cert-hash sha256:c84a37e0bee0b85813a3e1a04024c73601a4da9034372b2eef77013bb67f5321  --cri-socket "unix:///run/containerd/containerd.sock" --v=5
+
+
+
+--v=5 
+* is a Kubernetes command-line flag used to set the verbosity level for logs. 
+* It controls how much detail the command outputs during execution. 
+* Higher numbers give more detailed debugging information.
+
+After running this command in go to master node:
+
+# kubectl get nodes
+# kubectl get pods
+# kubectl get ns
+OR
+#  kubectl get namespace
+
+NAME              STATUS   AGE
+default           Active   36m
+kube-node-lease   Active   36m
+kube-public       Active   36m
+kube-system       Active   36m
+
+If you want to see all pods in the kube-system namespace, the command is:
+
+# kubectl get -n kube-system pods
+
+NAME                                       READY   STATUS    RESTARTS   AGE
+calico-kube-controllers-74d5f9d7bb-mqp67   1/1     Running   0          35m
+calico-node-88xjj                          1/1     Running   0          35m
+calico-node-fz8nl                          1/1     Running   0          11m
+coredns-76f75df574-97t7x                   1/1     Running   0          40m
+coredns-76f75df574-vwbdh                   1/1     Running   0          40m
+etcd-ip-172-31-43-51                       1/1     Running   0          40m
+kube-apiserver-ip-172-31-43-51             1/1     Running   0          40m
+kube-controller-manager-ip-172-31-43-51    1/1     Running   0          40m
+kube-proxy-6cbnx                           1/1     Running   0          40m
+kube-proxy-rvvrm                           1/1     Running   0          11m
+kube-scheduler-ip-172-31-43-51             1/1     Running   0          40m
+
+
+
+“In the kube-system namespace, we see all core Kubernetes control plane components like etcd, kube-apiserver, scheduler, controller-manager, coredns for DNS, and kube-proxy for networking. Additionally, because I manually installed the cluster with kubeadm and set up Calico as the CNI plugin, we also see Calico pods managing pod networking and network policies.”
+
+
+
+Pod Name
+Role
+Why It's There?
+calico-kube-controllers
+Manages Calico’s control-plane logic for network policies.
+Installed when you deployed Calico CNI plugin.
+calico-node
+Runs on each node to handle pod networking (CNI).
+Part of Calico for networking.
+coredns
+DNS service for pods inside the cluster.
+Default in all Kubernetes setups.
+etcd
+Stores all cluster state data (key-value store).
+Control plane component (installed by kubeadm).
+kube-apiserver
+Exposes Kubernetes API for kubectl, controllers, etc.
+Control plane component.
+kube-controller-manager
+Runs background controllers for node/pod management.
+Control plane component.
+kube-scheduler
+Schedules pods onto nodes based on resources and policies.
+Control plane component.
+kube-proxy
+Manages networking rules for pod-to-pod and pod-to-service.
+Deployed as a DaemonSet on all nodes.
+
+
+
+
+
+
+
