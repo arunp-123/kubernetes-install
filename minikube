@@ -1,1 +1,39 @@
+# mkdir minikube
+
+# curl -LO https://github.com/kubernetes/minikube/releases/latest/download/minikube-linux-amd64
+
+# sudo install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-amd64
+
+Start the minikube using this command
+
+# minikube start --driver=docker --vm=true
+
+
+
+# kubectl get nodes
+
+# kubectl get pods
+
+# kubectl get all
+
+List all nodes (control-plane + worker nodes) in a particular Kubernetes cluster using:
+
+# kubectl get nodes --context <cluster-context-name>
+
+Eg: Kind cluster
+# kubectl get nodes --context kind-my-kind-cluster
+
+Switch to a Particular Cluster
+
+# kubectl config use-context <cluster-context-name>
+# kubectl config use-context kind-my-kind-cluster
+
+Check current context
+
+# kubectl config current-context
+
+
+
+
+
 
