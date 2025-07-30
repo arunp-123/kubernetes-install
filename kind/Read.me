@@ -1,1 +1,74 @@
+# chmod +x kind.sh 
+# ./kind.sh
+
+kind & kubectl Successfully Installed
+
+# kind version
+
+# kubectl version
+
+Need to install Docker:
+
+# sudo apt update
+# sudo apt-get install docker.io
+
+Start Docker Service:
+
+# sudo systemctl start docker
+
+Enable Docker on Boot:
+
+# sudo systemctl enable docker
+
+adds the user ubuntu to the docker group
+
+# sudo usermod -aG docker ubuntu 
+# newgrp docker
+
+# docker ps
+
+
+KIND supports multi-node Kubernetes clusters by defining a YAML config file.
+You can configure:
+
+✅ Multiple Control-plane (Master) nodes for High Availability (HA).
+✅ Multiple Worker nodes for workload distribution.
+✅ Port mapping to expose services to your host machine.
+
+Multi-node clusters
+
+You can also have a cluster with multiple control-plane (Master Node) & worker nodes, create a config file. Mapping ports to the host machine also
+
+##Creating Cluster
+
+To create a Kubernetes cluster using KIND with the above configuration (config.yml)
+
+ $ kind create cluster --name=my-kind-cluster --config=config.yml
+
+View cluster information for a specific KIND cluster.
+
+# kubectl cluster-info --context kind-my-kind-cluster
+
+List all nodes in the cluster
+
+# kubectl get nodes
+
+List all pods in the current namespace
+
+# kubectl get pods
+
+List all services
+
+# kubectl get services
+
+shows all resources in the current namespace of your Kubernetes cluster
+
+# kubectl get all
+
+
+Delete cluster 
+
+# kind delete cluster --name=kind-cluster-name
+
+# kind delete cluster --name=my-kind-cluster
 
